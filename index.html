@@ -873,8 +873,35 @@ function ensureCombinedEvidence(evidence={},assignment=null){
 }
 
 
+function escapeRegex(value){
+  return String(value||"").replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+}
+
 function promptMatched(text,term){
-  return String(text||"").toLowerCase().includes(String(term||"").toLowerCase());
+  const source=String(text||"").toLowerCase();
+  const target=String(term||"").toLowerCase().trim();
+  if(!source||!target)return false;
+
+  // Stem prompts intentionally match complete words that begin with the stem,
+  // e.g. "measur" matches measure, measured and measuring.
+  const stemTerms=new Set([
+    "measur","communicat","assembl","prepar","recycl",
+    "professional","mainten","toleran"
+  ]);
+
+  if(stemTerms.has(target)){
+    const pattern=new RegExp(`\\b${escapeRegex(target)}[a-z]*\\b`,"i");
+    return pattern.test(source);
+  }
+
+  // Multi-word prompts must appear as a complete phrase.
+  if(target.includes(" ")){
+    const words=target.split(/\s+/).map(escapeRegex).join("\\s+");
+    return new RegExp(`\\b${words}\\b`,"i").test(source);
+  }
+
+  // Acronyms and single words must appear as complete words only.
+  return new RegExp(`\\b${escapeRegex(target)}\\b`,"i").test(source);
 }
 
 function renderPromptGuide(prompts,text,dataPrefix){
@@ -3126,7 +3153,7 @@ function settings(){
       <button class="primary" id="saveProfile">Save settings</button>
       <button class="secondary" id="backup">Export backup</button>
     </div>
-    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.3.8</p>
+    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.3.9</p>
   </section>`;
   const getSignature=setupSignaturePad(
     document.getElementById("learnerSignature"),
