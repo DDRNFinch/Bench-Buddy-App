@@ -1024,6 +1024,95 @@ function reflectionTopics(assignment){
 }
 
 
+function uniquePrompts(prompts){
+  const seen=new Set();
+  return (prompts||[]).filter(prompt=>{
+    const key=String(prompt.term||prompt.label||'').toLowerCase();
+    if(!key||seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function combinedReflectionPrompts(assignment){
+  return uniquePrompts(reflectionTopics(assignment).flatMap(topic=>topic.prompts));
+}
+
+function reflectionTopicSentence(assignment){
+  const titles=[...new Set(reflectionTopics(assignment).map(topic=>topic.title))];
+  if(!titles.length)return 'professional knowledge and behaviours';
+  if(titles.length===1)return titles[0].toLowerCase();
+  return `${titles.slice(0,-1).map(x=>x.toLowerCase()).join(', ')} and ${titles.at(-1).toLowerCase()}`;
+}
+
+function promptRegexSource(prompt){
+  const values=[prompt.label,prompt.term].filter(Boolean).map(value=>String(value).trim());
+  const aliases={
+    ppe:['PPE','personal protective equipment'],
+    rpe:['RPE','respiratory protective equipment'],
+    lev:['LEV','local exhaust ventilation'],
+    rams:['RAMS','risk assessment','method statement'],
+    communicat:['communication','communicated','discussed','explained'],
+    team:['team','teamwork','colleague','colleagues','working together'],
+    safe:['safe','safely','safe working'],
+    measur:['measure','measured','measurement','measurements','measuring'],
+    prepar:['prepare','prepared','preparation','preparing'],
+    assembl:['assemble','assembled','assembly','assembling'],
+    recycl:['recycle','recycled','recycling'],
+    check:['check','checked','checks','checking','quality check','quality checks']
+  };
+  (aliases[String(prompt.term||'').toLowerCase()]||[]).forEach(value=>values.push(value));
+  return [...new Set(values)].sort((a,b)=>b.length-a.length).map(value=>{
+    const escaped=value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    return escaped.length<=5&&!escaped.includes('\\ ')?`\\b${escaped}\\w*\\b`:`\\b${escaped}\\b`;
+  }).join('|');
+}
+
+function highlightedSegments(text,prompts){
+  const sources=uniquePrompts(prompts).map(promptRegexSource).filter(Boolean);
+  if(!sources.length)return [{text:String(text||''),bold:false}];
+  const regex=new RegExp(`(${sources.join('|')})`,'gi');
+  const segments=[];let last=0;const value=String(text||'');let match;
+  while((match=regex.exec(value))){
+    if(match.index>last)segments.push({text:value.slice(last,match.index),bold:false});
+    segments.push({text:match[0],bold:true});last=match.index+match[0].length;
+    if(regex.lastIndex===match.index)regex.lastIndex++;
+  }
+  if(last<value.length)segments.push({text:value.slice(last),bold:false});
+  return segments;
+}
+
+function drawHighlightedText(pdf,text,prompts,x,y,maxWidth,lineHeight=4.2,newPage=null){
+  const segments=highlightedSegments(text,prompts);
+  let cursorX=x,cursorY=y;
+  const tokens=[];
+  segments.forEach(segment=>{
+    String(segment.text).split(/(\s+|\n)/).forEach(token=>{if(token!=='')tokens.push({text:token,bold:segment.bold})});
+  });
+  for(const token of tokens){
+    if(token.text.includes('\n')){
+      const pieces=token.text.split('\n');
+      for(let i=0;i<pieces.length;i++){
+        if(pieces[i]){
+          pdf.setFont('helvetica',token.bold?'bold':'normal');
+          const width=pdf.getTextWidth(pieces[i]);
+          if(cursorX+width>x+maxWidth){cursorX=x;cursorY+=lineHeight;}
+          if(newPage&&cursorY>276){cursorY=newPage();cursorX=x;}
+          pdf.text(pieces[i],cursorX,cursorY);cursorX+=width;
+        }
+        if(i<pieces.length-1){cursorX=x;cursorY+=lineHeight;if(newPage&&cursorY>276)cursorY=newPage();}
+      }
+      continue;
+    }
+    pdf.setFont('helvetica',token.bold?'bold':'normal');
+    const width=pdf.getTextWidth(token.text);
+    if(cursorX+width>x+maxWidth&&!/^\s+$/.test(token.text)){cursorX=x;cursorY+=lineHeight;if(newPage&&cursorY>276)cursorY=newPage();}
+    if(!(cursorX===x&&/^\s+$/.test(token.text))){pdf.text(token.text,cursorX,cursorY);cursorX+=width;}
+  }
+  return cursorY+lineHeight;
+}
+
+
 function ensurePortfolioReflection(evidence={}){
   if(!evidence.reflection){
     evidence.reflection=Object.values(evidence.answers||{}).filter(Boolean).join("\n\n");
@@ -2194,7 +2283,7 @@ function evidence(){
         <p><b>Explain the following topics using examples from your workshop or workplace experience:</b> ${reflectionTopicSentence(a)}.</p>
         ${renderPromptGuide(combinedReflectionPrompts(a),ev.reflection||"",`reflection-${a.id}`)}
 
-        <textarea class="reflection-textarea" data-reflection="${a.id}" maxlength="9000" placeholder="Write one detailed reflection of at least 300 words that covers all topics and highlighted prompts.">${ev.reflection||""}</textarea>
+        <textarea class="reflection-textarea" data-reflection="${a.id}" maxlength="9000" placeholder="Write one clear reflection of at least 150 words that covers all topics and highlighted prompts.">${ev.reflection||""}</textarea>
         <small class="char-count word-count" data-reflection-count="${a.id}">${wordCount(ev.reflection)} / 150 words minimum</small>
         <span class="autosave-note">Your reflection saves automatically</span>
       </section>`:`<p class="locked">Add at least 3 evidence items and write a 150-word activity statement to unlock the Knowledge & Behaviour Reflection.</p>`}
@@ -2869,7 +2958,7 @@ function settings(){
       <button class="primary" id="saveProfile">Save settings</button>
       <button class="secondary" id="backup">Export backup</button>
     </div>
-    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.3.4</p>
+    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.3.5</p>
   </section>`;
   const getSignature=setupSignaturePad(
     document.getElementById("learnerSignature"),
