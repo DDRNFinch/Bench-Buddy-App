@@ -12,14 +12,7 @@ const APP_FILES=[
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
-  "./workbench-images/drawings.png",
-  "./workbench-images/fixings.jpg",
-  "./workbench-images/joints.png",
-  "./workbench-images/machinery.jpg",
-  "./workbench-images/mortice-chisel.jpg",
-  "./workbench-images/safety.jpg",
-  "./workbench-images/timber.jpg",
-  "./workbench-images/tools.jpg"
+  "./workbench-images/tenon-saw.png"
 ];
 
 self.addEventListener("install",event=>{
