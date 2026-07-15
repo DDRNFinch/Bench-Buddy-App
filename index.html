@@ -874,19 +874,86 @@ function ensureCombinedEvidence(evidence={},assignment=null){
 }
 
 
+function normalisePromptWord(word){
+  let w=String(word||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+  if(w.length>5&&w.endsWith("ies"))w=w.slice(0,-3)+"y";
+  else if(w.length>5&&w.endsWith("ing"))w=w.slice(0,-3);
+  else if(w.length>4&&w.endsWith("ed"))w=w.slice(0,-2);
+  else if(w.length>4&&w.endsWith("es"))w=w.slice(0,-2);
+  else if(w.length>3&&w.endsWith("s"))w=w.slice(0,-1);
+  return w;
+}
+
 function promptMatched(text,term){
-  const source=String(text||"").toLowerCase();
+  const source=String(text||"").toLowerCase().trim();
   const target=String(term||"").toLowerCase().trim();
   if(!source||!target)return false;
-  const escaped=target.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-  return new RegExp(`\\b${escaped}\\b`,"i").test(source);
+
+  const sourceWords=source
+    .replace(/[^a-z0-9\s-]/g," ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const targetWords=target
+    .replace(/[^a-z0-9\s-]/g," ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if(!targetWords.length)return false;
+
+  // Exact phrase first, including plural or tense variations word-by-word.
+  if(targetWords.length>1){
+    for(let i=0;i<=sourceWords.length-targetWords.length;i++){
+      const phraseMatches=targetWords.every((word,index)=>{
+        const sourceWord=sourceWords[i+index];
+        return sourceWord===word||
+          normalisePromptWord(sourceWord)===normalisePromptWord(word);
+      });
+      if(phraseMatches)return true;
+    }
+    return false;
+  }
+
+  const wanted=normalisePromptWord(targetWords[0]);
+  return sourceWords.some(word=>{
+    const normalised=normalisePromptWord(word);
+    return word===targetWords[0]||normalised===wanted;
+  });
+}
+
+const promptAliases={
+  "hazard":["hazards"],
+  "hazards":["hazard"],
+  "check":["checked","checking","checks"],
+  "checked":["check","checking","checks"],
+  "safe working":["worked safely","working safely"],
+  "quality checks":["quality check","checked quality","checking quality"],
+  "professional behaviour":["professional behaviours","professional attitude"],
+  "risk assessment":["risk assessments","RAMS"],
+  "toolbox talk":["toolbox talks"],
+  "method statement":["method statements"],
+  "hand tools":["hand tool"],
+  "power tools":["power tool"],
+  "measurements":["measurement","measured"],
+  "dimensions":["dimension"],
+  "materials":["material"],
+  "defects":["defect"],
+  "tolerances":["tolerance"],
+  "seals":["seal"],
+  "abrasives":["abrasive"]
+};
+
+function promptMatchedWithAliases(text,term){
+  if(promptMatched(text,term))return true;
+  const aliases=promptAliases[String(term||"").toLowerCase()]||[];
+  return aliases.some(alias=>promptMatched(text,alias));
 }
 
 function renderPromptGuide(prompts,text,dataPrefix){
   return `<div class="prompt-guide">
     <small>Try to include these points in your answer. They turn green when mentioned:</small>
     <div class="prompt-chips">
-      ${prompts.map((p,i)=>`<span class="prompt-chip ${promptMatched(text,p.term)?"matched":""}" data-prompt-chip="${dataPrefix}-${i}" data-term="${p.term}">${p.label}</span>`).join("")}
+      ${prompts.map((p,i)=>`<span class="prompt-chip ${promptMatchedWithAliases(text,p.term)?"matched":""}" data-prompt-chip="${dataPrefix}-${i}" data-term="${p.term}">${p.label}</span>`).join("")}
     </div>
   </div>`;
 }
@@ -1131,8 +1198,8 @@ function allRequiredPromptsMet(assignment,evidence){
   const activity=assignmentEvidencePrompts(assignment);
   const reflection=combinedReflectionPrompts(assignment);
   return {
-    activityOk:activity.every(p=>promptMatched(evidence.description||"",p.term)),
-    reflectionOk:reflection.every(p=>promptMatched(evidence.reflection||"",p.term))
+    activityOk:activity.every(p=>promptMatchedWithAliases(evidence.description||"",p.term)),
+    reflectionOk:reflection.every(p=>promptMatchedWithAliases(evidence.reflection||"",p.term))
   };
 }
 
@@ -2481,7 +2548,7 @@ function evidence(){
   const timers={};
   const updateChips=(prefix,text)=>{
     view().querySelectorAll(`[data-prompt-chip^="${prefix}-"]`).forEach(chip=>{
-      chip.classList.toggle("matched",promptMatched(text,chip.dataset.term));
+      chip.classList.toggle("matched",promptMatchedWithAliases(text,chip.dataset.term));
     });
   };
 
@@ -3122,7 +3189,7 @@ function settings(){
       <button class="primary" id="saveProfile">Save settings</button>
       <button class="secondary" id="backup">Export backup</button>
     </div>
-    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.3.10</p>
+    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.3.11</p>
   </section>`;
   const getSignature=setupSignaturePad(
     document.getElementById("learnerSignature"),
