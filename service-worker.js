@@ -1,9 +1,11 @@
 
 "use strict";
-const CACHE_NAME="bench-buddy-v2-0-4";
+const CACHE_NAME="bench-buddy-v3-0-0";
 const APP_FILES=[
   "./",
   "./index.html",
+  "./workbench-data.js",
+  "./workbench.js",
   "./app.js",
   "./assignment-pdf.js",
   "./register-service-worker.js",

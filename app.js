@@ -1135,6 +1135,7 @@ function mainRouteFor(name){
   if(["practical","documents","witness","otj"].includes(name))return "portfolio";
   if(["cards","assignmentQuiz","epaKnowledge","epaPracticalMock","epaDiscussionMock"].includes(name))return "revision";
   if(name==="settings")return "settings";
+  if(name==="workbench")return "workbench";
   if(name==="evidence")return "evidence";
   return "home";
 }
@@ -1169,6 +1170,7 @@ function headerNav(){
     ["home","🏠 Home"],
     ["evidence","🪵 Assignments"],
     ["portfolio","📂 Portfolio"],
+    ["workbench","🧰 Workbench"],
     ["revision","🎓 Revision"],
     ["settings","👤 Profile"]
   ];
@@ -1184,7 +1186,7 @@ function headerNav(){
   </div>`;
 }
 function render(){
-  const routes={home,evidence,portfolio,revision,otj,practical,cards,assignmentQuiz,epaKnowledge,epaPracticalMock,epaDiscussionMock,witness,documents,settings};
+  const routes={home,evidence,portfolio,workbench,revision,otj,practical,cards,assignmentQuiz,epaKnowledge,epaPracticalMock,epaDiscussionMock,witness,documents,settings};
   app.innerHTML=headerNav()+`<section id="view"></section>`;
   const activeMain=mainRouteFor(routeName);
   document.querySelectorAll(".tabs [data-route]").forEach(b=>b.classList.toggle("active",b.dataset.route===activeMain));
@@ -1224,25 +1226,6 @@ function revision(){
       <button data-route="epaPracticalMock">🧱<b>EPA Practical Mock</b><small>Learner self-mark and assessor judgement mark sheet.</small></button>
       <button data-route="epaDiscussionMock">💬<b>Professional Discussion Mock</b><small>Record discussion performance, evidence and actions.</small></button>
     </section>
-  <section class="card">
-    <h3>Learning Materials</h3>
-    <p class="small">Assignment-specific revision resources will appear here. Each assignment can include a short guide, key terminology, safety reminders and practice questions.</p>
-    <div class="learning-materials-grid">
-      ${assignments.map(a=>`<details class="learning-material-card">
-        <summary><b>Assignment ${a.id}: ${a.title}</b></summary>
-        <div class="small">
-          <p><b>Coming soon</b></p>
-          <p>Planned materials:</p>
-          <ul>
-            <li>Key knowledge summary</li>
-            <li>Important terminology</li>
-            <li>Safety and quality reminders</li>
-            <li>Practice questions</li>
-          </ul>
-        </div>
-      </details>`).join("")}
-    </div>
-  </section>
 `;
 }
 
@@ -2624,7 +2607,7 @@ function settings(){
       <button class="primary" id="saveProfile">Save settings</button>
       <button class="secondary" id="backup">Export backup</button>
     </div>
-    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 2.0.4</p>
+    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 3.0.0</p>
   </section>`;
   const getSignature=setupSignaturePad(
     document.getElementById("learnerSignature"),
