@@ -105,25 +105,33 @@ async function downloadAssignmentPdf(assignment,evidence,profile){
       }
 
       if(item.isImage){
-        const image=await getImage(item.key);
-        if(image){
+        try{
+          const image=await getImage(item.key);
+          if(!image)throw new Error("Image not found");
+
           const props=pdf.getImageProperties(image);
           const maxW=cellW-8;
           const maxH=contentHeight-3;
           const ratio=Math.min(maxW/props.width,maxH/props.height);
           const imageW=props.width*ratio;
           const imageH=props.height*ratio;
+          const format=String(image).startsWith("data:image/png")?"PNG":"JPEG";
+
           pdf.addImage(
             image,
-            "JPEG",
+            format,
             x+((cellW-imageW)/2),
             contentTop+((contentHeight-imageH)/2),
             imageW,
             imageH
           );
-        }else{
+        }catch(imageError){
+          console.warn(`Evidence image ${index+1} could not be added to the PDF`,imageError);
           pdf.setFont("helvetica","normal");
-          pdf.text("Image unavailable",x+4,contentTop+10);
+          pdf.setFontSize(8);
+          pdf.setTextColor(125,130,136);
+          pdf.text("Image could not be displayed",x+4,contentTop+10);
+          pdf.text("The original evidence remains saved.",x+4,contentTop+17);
         }
       }else{
         pdf.setFont("helvetica","bold");
@@ -241,8 +249,12 @@ async function downloadAssignmentPdf(assignment,evidence,profile){
     y+=12;
 
     if(profile.signature){
-      pdf.addImage(profile.signature,"PNG",margin,y,45,14);
-      y+=17;
+      try{
+        pdf.addImage(profile.signature,"PNG",margin,y,45,14);
+        y+=17;
+      }catch(signatureError){
+        console.warn("The saved signature could not be added to the PDF",signatureError);
+      }
     }
 
     pdf.setFont("helvetica","bold");
