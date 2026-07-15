@@ -1248,6 +1248,12 @@ const epaPracticalCriteria=[{"name":"Health, safety, PPE and workshop controls",
 
 const epaDiscussionQuestions=[{"q":"You are asked to use a fixed machine, but the guard is damaged and production is behind schedule. What do you do?","assignment":"Assignment 1 and 19","topic":"Health and safety","workplace":"Inspect an authorised machine with your supervisor and explain each safety control.","revision":""},{"q":"A large quantity of usable timber offcuts is being placed in general waste. How would you respond?","assignment":"Assignment 2","topic":"Environmental working","workplace":"Review workshop waste routes and identify reusable or recyclable materials.","revision":""},{"q":"The cutting list and product drawing contain different component dimensions. What actions would you take?","assignment":"Assignment 3","topic":"Drawings","workplace":"Compare a drawing and cutting list and practise resolving revision differences.","revision":""},{"q":"The available timber includes bow, twist and knots close to joint positions. How would you select suitable components?","assignment":"Assignment 4","topic":"Material selection","workplace":"Grade a selection of timber and explain which defects affect each component.","revision":""},{"q":"A colleague has misunderstood the assembly sequence and has prepared components incorrectly. How would you manage the situation?","assignment":"Assignment 5","topic":"Communication","workplace":"Practise a task briefing that confirms roles, sequence and quality checks.","revision":""},{"q":"A chisel is blunt and begins to crush the fibres at a joint shoulder. What should happen next?","assignment":"Assignment 6","topic":"Hand tools","workplace":"Sharpen a chisel and compare the result on a test joint.","revision":""},{"q":"A portable router begins vibrating more than normal during use. What would you do?","assignment":"Assignment 7","topic":"Power tools","workplace":"Complete a pre-use inspection and discuss common causes of vibration.","revision":""},{"q":"A jig produces the first component accurately but later components drift out of position. How would you investigate this?","assignment":"Assignment 8","topic":"Jigs","workplace":"Test a jig repeatedly and inspect stops, guides and clamping.","revision":""},{"q":"Several repeated components have different joint positions despite using the same drawing. What could have caused this and how would you correct it?","assignment":"Assignment 9","topic":"Setting out","workplace":"Use a setting rod or template to mark a repeated component set.","revision":""},{"q":"A mortice-and-tenon joint fits tightly, but the shoulders do not close evenly. What checks would you make?","assignment":"Assignment 10","topic":"Woodworking joints","workplace":"Produce and diagnose a test mortice-and-tenon joint.","revision":""},{"q":"A biscuit joint is aligned correctly but opens when clamps are removed. What would you consider?","assignment":"Assignment 11","topic":"Timber connections","workplace":"Review adhesive, clamping and connection preparation on a sample.","revision":""},{"q":"A casement binds in the frame during dry fitting. How would you identify and correct the cause?","assignment":"Assignment 12","topic":"Windows","workplace":"Dry-fit and check a small frame-and-casement sample.","revision":""},{"q":"The finished stair components do not produce consistent rise and going when assembled. What would you investigate?","assignment":"Assignment 13","topic":"Staircases","workplace":"Check staircase component dimensions against a drawing.","revision":""},{"q":"A manufactured door frame is square but the opening size is incorrect. What would you do?","assignment":"Assignment 14","topic":"Frames and linings","workplace":"Set out a frame from opening dimensions and check allowances.","revision":""},{"q":"A door assembly is out of square after clamping. How would you assess whether it can be corrected?","assignment":"Assignment 15","topic":"Timber doors","workplace":"Practise diagonal checks and controlled clamping on a frame.","revision":""},{"q":"A cabinet carcass is square, but the doors and drawer fronts do not align. What checks would you make?","assignment":"Assignment 16","topic":"Units","workplace":"Set up and adjust representative cabinet ironmongery.","revision":""},{"q":"Repeated spindle components show small differences in profile and length. How would you improve consistency?","assignment":"Assignment 17","topic":"Mouldings and balustrades","workplace":"Use stops, templates or jigs to produce repeated test components.","revision":""},{"q":"A finish highlights sanding scratches after the first coat. What would you do before continuing?","assignment":"Assignment 18","topic":"Finishes and ironmongery","workplace":"Prepare and finish a sample panel using a controlled sanding sequence.","revision":""},{"q":"A machine produces burning and an inconsistent cut despite the dimensions being set correctly. What would you investigate?","assignment":"Assignment 19","topic":"Fixed machinery","workplace":"Discuss cutter condition, feed rate, extraction and setup with an authorised supervisor.","revision":""},{"q":"A fire-door assembly has the correct ironmongery but the gaps and seals do not meet the specification. What action is required?","assignment":"Assignment 20","topic":"Fire doors","workplace":"Inspect a fire-door assembly against manufacturer or certification information.","revision":""}];
 
+function epaReadyPercentage(marks,total){
+  const values=Object.values(marks||{});
+  const ready=values.filter(mark=>mark==="EPA Ready").length;
+  return total>0?Math.round((ready/total)*100):0;
+}
+
 function mockJudgementSummary(values){
   const list=Object.values(values||{});
   if(!list.length)return "Not Assessed";
@@ -1355,7 +1361,9 @@ async function downloadEpaPracticalMockPdf(record,profile){
     ["Practical task",record.task||"Not entered"]
   ],y);
   y=sectionTitle(pdf,"Overall Judgement",y);
-  pdf.setFont("helvetica","bold");pdf.setFontSize(12);pdf.text(mockJudgementSummary(record.marks),margin,y);y+=10;
+  pdf.setFont("helvetica","bold");pdf.setFontSize(12);pdf.text(mockJudgementSummary(record.marks),margin,y);
+  pdf.text(`EPA Ready score: ${epaReadyPercentage(record.marks,epaPracticalCriteria.length)}%`,120,y);
+  y+=10;
 
   epaPracticalCriteria.forEach((criterion,index)=>{
     const mark=record.marks?.[criterion.name]||"Not assessed";
@@ -1421,7 +1429,8 @@ async function downloadEpaDiscussionMockPdf(record,profile){
     ["Learner",record.learnerName||profile.learner||"Not entered"],
     ["Assessor",record.assessorName||profile.assessor||"Not entered"],
     ["Date",record.date?pdfUkDate(record.date+"T12:00:00"):pdfUkDate()],
-    ["Overall judgement",mockJudgementSummary(record.marks)]
+    ["Overall judgement",mockJudgementSummary(record.marks)],
+    ["EPA Ready score",`${epaReadyPercentage(record.marks,epaDiscussionQuestions.length)}%`]
   ],y);
 
   epaDiscussionQuestions.forEach((item,index)=>{
@@ -1473,7 +1482,7 @@ function epaPracticalMock(){
     <label>Date<input id="epaPracticalDate" type="date" value="${record.date||new Date().toISOString().slice(0,10)}"></label>
     <label>Practical task<input id="epaPracticalTask" value="${record.task||""}" placeholder="Manufacture a framed and jointed bench-joinery product to the drawing and specification"></label>
   </div></section>
-  <section class="card"><h3>Assessor Mark</h3><div class="criteria">${epaPracticalCriteria.map(c=>`<label>${c.name}<select data-epa-practical-mark="${c.name}">${options.map(v=>`<option ${record.marks?.[c.name]===v?"selected":""}>${v}</option>`).join("")}</select></label>`).join("")}</div>
+  <section class="card"><div class="split"><h3>Assessor Mark</h3><div class="metric compact-metric"><span>EPA Ready score</span><strong id="epaPracticalScore">${epaReadyPercentage(record.marks,epaPracticalCriteria.length)}%</strong></div></div><div class="criteria">${epaPracticalCriteria.map(c=>`<label>${c.name}<select data-epa-practical-mark="${c.name}">${options.map(v=>`<option ${record.marks?.[c.name]===v?"selected":""}>${v}</option>`).join("")}</select></label>`).join("")}</div>
   <label>Assessor feedback and next actions<textarea id="epaPracticalComments">${record.comments||""}</textarea></label></section>
   <section class="card"><h3>Assessor Signature</h3><div class="signature-wrap"><canvas id="epaPracticalSignature" class="signature-pad"></canvas><button class="secondary" id="clearEpaPracticalSignature">Clear signature</button></div></section>
   <section class="card"><div class="button-row"><button class="danger" id="resetEpaPractical">Reset Mock</button><button class="secondary" id="saveEpaPractical">Save Mark Sheet</button><button class="primary" id="downloadEpaPractical">Download PDF</button></div></section>`;
@@ -1494,6 +1503,15 @@ function epaPracticalMock(){
       marks,signature
     };
   };
+  const updatePracticalScore=()=>{
+    const marks={};
+    view().querySelectorAll("[data-epa-practical-mark]").forEach(x=>marks[x.dataset.epaPracticalMark]=x.value);
+    const score=document.getElementById("epaPracticalScore");
+    if(score)score.textContent=`${epaReadyPercentage(marks,epaPracticalCriteria.length)}%`;
+  };
+  view().querySelectorAll("[data-epa-practical-mark]").forEach(x=>x.addEventListener("change",updatePracticalScore));
+  updatePracticalScore();
+
   document.getElementById("resetEpaPractical").onclick=()=>{
     if(!confirm("Reset the EPA Practical Mock? This will clear all marks, names, comments and the signature."))return;
     state.epaPracticalMock={marks:{},comments:"",learnerName:state.profile.learner||"",assessorName:state.profile.assessor||"",date:new Date().toISOString().slice(0,10),task:"",signature:""};
@@ -1512,7 +1530,7 @@ function epaDiscussionMock(){
     <label>Learner name<input id="epaDiscussionLearner" value="${record.learnerName||""}"></label>
     <label>Assessor name<input id="epaDiscussionAssessor" value="${record.assessorName||""}"></label>
     <label>Date<input id="epaDiscussionDate" type="date" value="${record.date||new Date().toISOString().slice(0,10)}"></label>
-  </div></section>
+  </div><div class="metric compact-metric"><span>EPA Ready score</span><strong id="epaDiscussionScore">${epaReadyPercentage(record.marks,epaDiscussionQuestions.length)}%</strong></div></section>
   ${epaDiscussionQuestions.map((item,index)=>`<section class="card"><div class="split"><h3>Question ${index+1}</h3><small>${item.assignment} • ${item.topic}</small></div><p><b>${item.q}</b></p><label>Assessor judgement<select data-epa-discussion-mark="${index}">${options.map(v=>`<option ${record.marks?.[index]===v?"selected":""}>${v}</option>`).join("")}</select></label></section>`).join("")}
   <section class="card"><label>Overall assessor feedback and priority revision<textarea id="epaDiscussionComments">${record.comments||""}</textarea></label></section>
   <section class="card"><h3>Assessor Signature</h3><div class="signature-wrap"><canvas id="epaDiscussionSignature" class="signature-pad"></canvas><button class="secondary" id="clearEpaDiscussionSignature">Clear signature</button></div></section>
@@ -1533,6 +1551,15 @@ function epaDiscussionMock(){
       marks,signature
     };
   };
+  const updateDiscussionScore=()=>{
+    const marks={};
+    view().querySelectorAll("[data-epa-discussion-mark]").forEach(x=>marks[x.dataset.epaDiscussionMark]=x.value);
+    const score=document.getElementById("epaDiscussionScore");
+    if(score)score.textContent=`${epaReadyPercentage(marks,epaDiscussionQuestions.length)}%`;
+  };
+  view().querySelectorAll("[data-epa-discussion-mark]").forEach(x=>x.addEventListener("change",updateDiscussionScore));
+  updateDiscussionScore();
+
   document.getElementById("resetEpaDiscussion").onclick=()=>{
     if(!confirm("Reset the Professional Discussion Mock? This will clear all marks, names, comments and the signature."))return;
     state.epaDiscussionMock={marks:{},comments:"",learnerName:state.profile.learner||"",assessorName:state.profile.assessor||"",date:new Date().toISOString().slice(0,10),signature:""};
@@ -2587,7 +2614,7 @@ function settings(){
       <button class="primary" id="saveProfile">Save settings</button>
       <button class="secondary" id="backup">Export backup</button>
     </div>
-    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 2.0.2</p>
+    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 2.0.3</p>
   </section>`;
   const getSignature=setupSignaturePad(
     document.getElementById("learnerSignature"),
