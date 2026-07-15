@@ -1012,6 +1012,94 @@ function reflectionTopics(assignment){
   });
 }
 
+
+function uniquePrompts(prompts){
+  const seen=new Set();
+  return prompts.filter(prompt=>{
+    const key=String(prompt.term||prompt.label||"").toLowerCase();
+    if(!key||seen.has(key))return false;
+    seen.add(key);return true;
+  });
+}
+
+function combinedReflectionPrompts(assignment){
+  return uniquePrompts(reflectionTopics(assignment).flatMap(topic=>topic.prompts)).slice(0,12);
+}
+
+function reflectionTopicSentence(assignment){
+  const titles=[...new Set(reflectionTopics(assignment).map(topic=>topic.title))];
+  if(!titles.length)return "professional knowledge and behaviours";
+  if(titles.length===1)return titles[0].toLowerCase();
+  return `${titles.slice(0,-1).map(x=>x.toLowerCase()).join(", ")} and ${titles.at(-1).toLowerCase()}`;
+}
+
+function promptRegexSource(prompt){
+  const values=[prompt.label,prompt.term].filter(Boolean).map(value=>String(value).trim());
+  const aliases={
+    "ppe":["PPE","personal protective equipment"],
+    "rpe":["RPE","respiratory protective equipment"],
+    "lev":["LEV","local exhaust ventilation"],
+    "rams":["RAMS","risk assessment","method statement"],
+    "communicat":["communication","communicated","discussed","explained"],
+    "team":["team","teamwork","colleague","colleagues","working together"],
+    "safe":["safe","safely","safe working"],
+    "measur":["measure","measured","measurement","measurements","measuring"],
+    "prepar":["prepare","prepared","preparation","preparing"],
+    "assembl":["assemble","assembled","assembly","assembling"],
+    "recycl":["recycle","recycled","recycling"],
+    "check":["check","checked","checks","checking","quality check","quality checks"]
+  };
+  (aliases[String(prompt.term||"").toLowerCase()]||[]).forEach(value=>values.push(value));
+  return [...new Set(values)].sort((a,b)=>b.length-a.length).map(value=>{
+    const escaped=value.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+    return escaped.length<=5&&!escaped.includes("\\ ")?`\\b${escaped}\\w*\\b`:`\\b${escaped}\\b`;
+  }).join("|");
+}
+
+function highlightedSegments(text,prompts){
+  const sources=uniquePrompts(prompts).map(promptRegexSource).filter(Boolean);
+  if(!sources.length)return [{text:String(text||""),bold:false}];
+  const regex=new RegExp(`(${sources.join("|")})`,`gi`);
+  const segments=[];let last=0;const value=String(text||"");let match;
+  while((match=regex.exec(value))){
+    if(match.index>last)segments.push({text:value.slice(last,match.index),bold:false});
+    segments.push({text:match[0],bold:true});last=match.index+match[0].length;
+    if(regex.lastIndex===match.index)regex.lastIndex++;
+  }
+  if(last<value.length)segments.push({text:value.slice(last),bold:false});
+  return segments;
+}
+
+function drawHighlightedText(pdf,text,prompts,x,y,maxWidth,lineHeight=4.2,newPage=null){
+  const segments=highlightedSegments(text,prompts);
+  let cursorX=x,cursorY=y;
+  const tokens=[];
+  segments.forEach(segment=>{
+    String(segment.text).split(/(\s+|\n)/).forEach(token=>{if(token!=="")tokens.push({text:token,bold:segment.bold})});
+  });
+  for(const token of tokens){
+    if(token.text.includes("\n")){
+      const pieces=token.text.split("\n");
+      for(let i=0;i<pieces.length;i++){
+        if(pieces[i]){
+          pdf.setFont("helvetica",token.bold?"bold":"normal");
+          const width=pdf.getTextWidth(pieces[i]);
+          if(cursorX+width>x+maxWidth){cursorX=x;cursorY+=lineHeight;}
+          if(newPage&&cursorY>276){cursorY=newPage();cursorX=x;}
+          pdf.text(pieces[i],cursorX,cursorY);cursorX+=width;
+        }
+        if(i<pieces.length-1){cursorX=x;cursorY+=lineHeight;if(newPage&&cursorY>276)cursorY=newPage();}
+      }
+      continue;
+    }
+    pdf.setFont("helvetica",token.bold?"bold":"normal");
+    const width=pdf.getTextWidth(token.text);
+    if(cursorX+width>x+maxWidth&&!/^\s+$/.test(token.text)){cursorX=x;cursorY+=lineHeight;if(newPage&&cursorY>276)cursorY=newPage();}
+    if(!(cursorX===x&&/^\s+$/.test(token.text))){pdf.text(token.text,cursorX,cursorY);cursorX+=width;}
+  }
+  return cursorY+lineHeight;
+}
+
 function ensurePortfolioReflection(evidence={}){
   if(!evidence.reflection){
     evidence.reflection=Object.values(evidence.answers||{}).filter(Boolean).join("\n\n");
@@ -1150,22 +1238,33 @@ async function downloadAssignmentPdf(assignment,evidence,profile){
     }
 
     y=ensure(25,y);y=sectionTitle(pdf,"Learner Activity Statement",y);
-    const desc=pdf.splitTextToSize(evidence.description||"",contentW-10),descH=Math.max(22,desc.length*4+10);
-    y=ensure(descH,y);pdf.setFillColor(248,249,251);pdf.roundedRect(margin,y,contentW,descH,3,3,"F");
-    pdf.setFont("helvetica","normal");pdf.setFontSize(8.5);pdf.text(desc,margin+5,y+7);y+=descH+7;
+    pdf.setFontSize(8.5);
+    y=drawHighlightedText(pdf,evidence.description||"",assignmentEvidencePrompts(assignment),margin,y,contentW,4.2,newPage)+5;
 
     y=ensure(20,y);y=sectionTitle(pdf,"Knowledge & Behaviour Reflection",y);
-    topics.forEach(topic=>{
-      const topicLines=pdf.splitTextToSize(`${topic.ref} – ${topic.title}`,contentW);
-      y=ensure(topicLines.length*4+5,y);pdf.setFont("helvetica","bold");pdf.setFontSize(8.5);pdf.text(topicLines,margin,y);y+=topicLines.length*4+2;
-    });
-    const reflection=pdf.splitTextToSize(evidence.reflection||"",contentW-10),refH=Math.max(28,reflection.length*4+10);
-    y=ensure(refH,y);pdf.setFillColor(248,249,251);pdf.roundedRect(margin,y,contentW,refH,3,3,"F");
-    pdf.setFont("helvetica","normal");pdf.setFontSize(8.5);pdf.text(reflection,margin+5,y+7);y+=refH+7;
+    pdf.setFont("helvetica","bold");pdf.setFontSize(8.5);
+    const topicSummary=pdf.splitTextToSize(`Topics covered: ${reflectionTopicSentence(assignment)}.`,contentW);
+    pdf.text(topicSummary,margin,y);y+=topicSummary.length*4+4;
+    pdf.setFontSize(8.5);
+    y=drawHighlightedText(pdf,evidence.reflection||"",combinedReflectionPrompts(assignment),margin,y,contentW,4.2,newPage)+6;
 
-    y=ensure(24,y);y=sectionTitle(pdf,"KSB Mapping – Assessor Reference",y);
-    pdf.setFont("helvetica","normal");pdf.setFontSize(8.5);
-    pdf.text(pdf.splitTextToSize(ksbs.join(" • "),contentW),margin,y);y+=10;
+    y=ensure(36,y);y=sectionTitle(pdf,"KSBs Evidenced – Assessor Reference",y);
+    const knowledge=ksbs.filter(x=>x.startsWith("K"));
+    const skills=ksbs.filter(x=>x.startsWith("S"));
+    const behaviours=ksbs.filter(x=>x.startsWith("B"));
+    pdf.setFontSize(8.5);
+    [["Knowledge",knowledge],["Skills",skills],["Behaviours",behaviours]].forEach(([label,items])=>{
+      if(!items.length)return;
+      pdf.setFont("helvetica","bold");pdf.text(`${label}:`,margin,y);
+      pdf.setFont("helvetica","normal");pdf.text(items.join(" • "),margin+25,y);y+=6;
+    });
+    const met=[...assignmentEvidencePrompts(assignment),...combinedReflectionPrompts(assignment)]
+      .filter(prompt=>promptMatched(`${evidence.description||""} ${evidence.reflection||""}`,prompt.term))
+      .map(prompt=>prompt.label);
+    if(met.length){
+      y+=2;pdf.setFont("helvetica","bold");pdf.text("Prompts met:",margin,y);y+=5;
+      pdf.setFont("helvetica","bold");pdf.text(pdf.splitTextToSize([...new Set(met)].join(" • "),contentW),margin,y);y+=10;
+    }
 
     y=ensure(38,y);y=sectionTitle(pdf,"Learner Declaration",y);
     pdf.setFont("helvetica","normal");pdf.setFontSize(8);
@@ -2166,14 +2265,10 @@ function evidence(){
         <h3>Knowledge & Behaviour Reflection</h3>
         <p>Explain the following topics within one continuous answer. Use examples from your workshop or workplace experience.</p>
 
-        ${topics.map((topic,index)=>`
-          <section class="reflection-topic">
-            <h4>${topic.ref} – ${topic.title}</h4>
-            <small>${topic.question}</small>
-            ${renderPromptGuide(topic.prompts,ev.reflection||"",`reflection-${a.id}-${index}`)}
-          </section>`).join("")}
+        <p><b>Explain the following topics using examples from your workshop or workplace experience:</b> ${reflectionTopicSentence(a)}.</p>
+        ${renderPromptGuide(combinedReflectionPrompts(a),ev.reflection||"",`reflection-${a.id}`)}
 
-        <textarea class="reflection-textarea" data-reflection="${a.id}" maxlength="9000" placeholder="Write one detailed reflection of at least 300 words that covers all of the topics and highlighted prompts.">${ev.reflection||""}</textarea>
+        <textarea class="reflection-textarea" data-reflection="${a.id}" maxlength="9000" placeholder="Write one detailed reflection of at least 300 words that covers all topics and highlighted prompts.">${ev.reflection||""}</textarea>
         <small class="char-count word-count" data-reflection-count="${a.id}">${wordCount(ev.reflection)} / 300 words minimum</small>
         <span class="autosave-note">Your reflection saves automatically</span>
       </section>`:`<p class="locked">Add at least 3 evidence items and write a 150-word activity statement to unlock the Knowledge & Behaviour Reflection.</p>`}
@@ -2298,7 +2393,7 @@ function evidence(){
       const count=wordCount(box.value);
       const el=view().querySelector(`[data-reflection-count="${id}"]`);
       if(el){el.textContent=`${count} / 300 words minimum`;el.classList.toggle("valid",count>=300)}
-      reflectionTopics(a).forEach((_,index)=>updateChips(`reflection-${id}-${index}`,box.value));
+      updateChips(`reflection-${id}`,box.value);
     };
     box.addEventListener("input",()=>{refresh();schedule(id)});
     box.addEventListener("blur",()=>saveText(id));refresh();
@@ -2844,7 +2939,7 @@ function settings(){
       <button class="primary" id="saveProfile">Save settings</button>
       <button class="secondary" id="backup">Export backup</button>
     </div>
-    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.3.1</p>
+    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.3.3</p>
   </section>`;
   const getSignature=setupSignaturePad(
     document.getElementById("learnerSignature"),
