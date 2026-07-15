@@ -2,14 +2,30 @@
 "use strict";
 
 const WORKBENCH_CATEGORY_META={
-  "Tools":{icon:"🪚",description:"Hand tools, portable tools and measuring equipment."},
-  "Timber & Boards":{icon:"🌳",description:"UK timber species, boards, defects and moisture."},
-  "Joints":{icon:"🧩",description:"Common bench-joinery joints and where they are used."},
-  "Fixings & Adhesives":{icon:"🔩",description:"Mechanical fixings, cabinet fittings and adhesives."},
-  "Machinery":{icon:"⚙️",description:"Fixed workshop machinery and safe operating principles."},
-  "Health & Safety":{icon:"⚠️",description:"Practical workshop controls, PPE, RPE and safe systems."},
-  "Drawings & Quality":{icon:"📐",description:"Drawings, setting out, tolerances and quality checks."}
+  "Tools":{icon:"🪚",image:"./workbench-images/tools.jpg",description:"Hand tools, portable tools and measuring equipment."},
+  "Timber & Boards":{icon:"🌳",image:"./workbench-images/timber.jpg",description:"UK timber species, boards, defects and moisture."},
+  "Joints":{icon:"🧩",image:"./workbench-images/joints.png",description:"Common bench-joinery joints and where they are used."},
+  "Fixings & Adhesives":{icon:"🔩",image:"./workbench-images/fixings.jpg",description:"Mechanical fixings, cabinet fittings and adhesives."},
+  "Machinery":{icon:"⚙️",image:"./workbench-images/machinery.jpg",description:"Fixed workshop machinery and safe operating principles."},
+  "Health & Safety":{icon:"⚠️",image:"./workbench-images/safety.jpg",description:"Practical workshop controls, PPE, RPE and safe systems."},
+  "Drawings & Quality":{icon:"📐",image:"./workbench-images/drawings.png",description:"Drawings, setting out, tolerances and quality checks."}
 };
+
+const WORKBENCH_ITEM_IMAGES={
+  "mortice-chisel":"./workbench-images/mortice-chisel.jpg",
+  "mortice-and-tenon":"./workbench-images/joints.png",
+  "woodscrew":"./workbench-images/fixings.jpg",
+  "table-saw":"./workbench-images/machinery.jpg",
+  "ppe":"./workbench-images/safety.jpg",
+  "mdf":"./workbench-images/timber.jpg",
+  "jack-plane":"./workbench-images/tools.jpg",
+  "smoothing-plane":"./workbench-images/tools.jpg"
+};
+
+function workbenchImage(card){
+  return WORKBENCH_ITEM_IMAGES[card.id]||WORKBENCH_CATEGORY_META[card.category]?.image||"./workbench-images/tools.jpg";
+}
+
 
 let workbenchQuery="";
 let workbenchCategory="All";
@@ -54,7 +70,7 @@ function workbenchMatches(card,query){
 function workbenchCardTile(card){
   const favourite=workbenchState().favourites.includes(card.id);
   return `<button class="workbench-card-tile" data-workbench-card="${card.id}">
-    <span class="workbench-card-icon">${card.icon||"🧰"}</span>
+    <img class="workbench-card-photo" src="${workbenchImage(card)}" alt="${card.title}" loading="lazy">
     <span class="workbench-card-copy">
       <b>${card.title}</b>
       <small>${card.category} • ${card.level}</small>
@@ -62,6 +78,7 @@ function workbenchCardTile(card){
     <span class="workbench-star ${favourite?"active":""}" aria-label="Favourite">${favourite?"★":"☆"}</span>
   </button>`;
 }
+
 
 function workbench(){
   const categories=Object.keys(WORKBENCH_CATEGORY_META);
@@ -108,7 +125,7 @@ function workbench(){
           const meta=WORKBENCH_CATEGORY_META[category];
           const count=WORKBENCH_CARDS.filter(card=>card.category===category).length;
           return `<button class="workbench-category ${workbenchCategory===category?"active":""}" data-workbench-category="${category}">
-            <span>${meta.icon}</span><b>${category}</b><small>${count} cards</small>
+            <img src="${meta.image}" alt="${category}" loading="lazy"><b>${meta.icon} ${category}</b><small>${count} cards</small>
           </button>`;
         }).join("")}
       </div>
@@ -145,9 +162,9 @@ function workbench(){
     workbench();
   });
   view().querySelectorAll("[data-workbench-category]").forEach(button=>button.onclick=()=>{
-    workbenchCategory=button.dataset.workbenchCategory;
-    workbenchQuery="";
-    workbench();
+    const category=button.dataset.workbenchCategory;
+    if(category==="All")openWorkbenchCategory("All");
+    else openWorkbenchCategory(category);
   });
   view().querySelectorAll("[data-workbench-card]").forEach(button=>button.onclick=event=>{
     const id=button.dataset.workbenchCard;
@@ -159,6 +176,40 @@ function workbench(){
     }
     openWorkbenchCard(id);
   });
+}
+
+function openWorkbenchCategory(category){
+  workbenchCategory=category;
+  workbenchQuery="";
+  const meta=category==="All"?{icon:"🧰",image:"./workbench-images/tools.jpg",description:"Browse the complete Workbench knowledge library."}:WORKBENCH_CATEGORY_META[category];
+  const cards=WORKBENCH_CARDS.filter(card=>category==="All"||card.category===category);
+
+  view().innerHTML=`
+    <div class="subpage-back"><button class="secondary" id="backToWorkbenchHome">← Back to Workbench</button></div>
+    <section class="card workbench-category-page-head">
+      <img src="${meta.image}" alt="${category}" class="workbench-category-hero-image">
+      <div><span class="eyebrow">WORKBENCH DRAWER</span><h2>${meta.icon} ${category==="All"?"All cards":category}</h2><p>${meta.description}</p><small>${cards.length} cards</small></div>
+    </section>
+    <section class="card">
+      <div class="workbench-search-wrap"><span>🔍</span><input id="categorySearch" placeholder="Search within ${category}…"><button id="clearCategorySearch" class="secondary">Clear</button></div>
+      <div id="categoryCardList" class="workbench-list">${cards.map(workbenchCardTile).join("")}</div>
+    </section>`;
+
+  document.getElementById("backToWorkbenchHome").onclick=()=>{workbenchCategory="All";workbenchQuery="";workbench()};
+  const input=document.getElementById("categorySearch");
+  const renderList=()=>{
+    const q=input.value.trim();
+    const filtered=cards.filter(card=>workbenchMatches(card,q));
+    document.getElementById("categoryCardList").innerHTML=filtered.length?filtered.map(workbenchCardTile).join(""):'<div class="empty">No cards match this search.</div>';
+    document.querySelectorAll("[data-workbench-card]").forEach(button=>button.onclick=event=>{
+      const id=button.dataset.workbenchCard;
+      if(event.target.closest(".workbench-star")){event.stopPropagation();toggleWorkbenchFavourite(id);renderList();return}
+      openWorkbenchCard(id);
+    });
+  };
+  input.addEventListener("input",renderList);
+  document.getElementById("clearCategorySearch").onclick=()=>{input.value="";renderList();input.focus()};
+  renderList();
 }
 
 function openWorkbenchCard(id){
@@ -174,7 +225,7 @@ function openWorkbenchCard(id){
     <div class="subpage-back"><button class="secondary" id="backToWorkbench">← Back to Workbench</button></div>
     <article class="card workbench-detail">
       <div class="workbench-detail-head">
-        <div class="workbench-visual"><span>${card.icon||"🧰"}</span><small>${card.category}</small></div>
+        <div class="workbench-visual"><img src="${workbenchImage(card)}" alt="${card.title}"><small>${card.category}</small></div>
         <div><span class="eyebrow">${card.level}</span><h2>${card.title}</h2><p>${card.summary}</p></div>
         <button class="workbench-favourite-button ${favourite?"active":""}" id="workbenchFavourite">${favourite?"★ Favourite":"☆ Add favourite"}</button>
       </div>
@@ -196,9 +247,10 @@ function openWorkbenchCard(id){
       </div>
 
       ${related.length?`<section><h3>Related topics</h3><div class="workbench-list">${related.map(workbenchCardTile).join("")}</div></section>`:""}
+      <small class="workbench-image-credit">Reference photographs are stored locally in the app and sourced from Wikimedia Commons under their stated licences.</small>
     </article>`;
 
-  document.getElementById("backToWorkbench").onclick=workbench;
+  document.getElementById("backToWorkbench").onclick=()=>openWorkbenchCategory(card.category);
   document.getElementById("workbenchFavourite").onclick=()=>{
     toggleWorkbenchFavourite(id);
     openWorkbenchCard(id);

@@ -2607,7 +2607,7 @@ function settings(){
       <button class="primary" id="saveProfile">Save settings</button>
       <button class="secondary" id="backup">Export backup</button>
     </div>
-    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 3.0.0</p>
+    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 3.0.1</p>
   </section>`;
   const getSignature=setupSignaturePad(
     document.getElementById("learnerSignature"),

@@ -1,6 +1,6 @@
 
 "use strict";
-const CACHE_NAME="bench-buddy-v3-0-0";
+const CACHE_NAME="bench-buddy-v3-0-1";
 const APP_FILES=[
   "./",
   "./index.html",
@@ -11,7 +11,15 @@ const APP_FILES=[
   "./register-service-worker.js",
   "./manifest.json",
   "./icon-192.png",
-  "./icon-512.png"
+  "./icon-512.png",
+  "./workbench-images/drawings.png",
+  "./workbench-images/fixings.jpg",
+  "./workbench-images/joints.png",
+  "./workbench-images/machinery.jpg",
+  "./workbench-images/mortice-chisel.jpg",
+  "./workbench-images/safety.jpg",
+  "./workbench-images/timber.jpg",
+  "./workbench-images/tools.jpg"
 ];
 
 self.addEventListener("install",event=>{
