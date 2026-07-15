@@ -1780,6 +1780,9 @@ function render(){
   document.querySelectorAll(".tabs [data-route]").forEach(b=>b.classList.toggle("active",b.dataset.route===activeMain));
   (routes[routeName]||home)();
   addSubpageBackButton();
+  if(benchBuddyIsInstalled()){
+    document.querySelectorAll("[data-install-app], .install-card, #installPrompt, #installBanner").forEach(el=>el.remove());
+  }
 }
 
 function view(){return document.getElementById("view")}
@@ -2181,6 +2184,11 @@ function nextStepAssignments(){
   const next=assignments.find(a=>assignmentProgressState(a)==="not-started");
   return next?[next]:[];
 }
+function benchBuddyIsInstalled(){
+  return window.matchMedia("(display-mode: standalone)").matches ||
+         window.navigator.standalone===true;
+}
+
 function home(){
   const knowledgeStatus=knowledgeReadiness();
   const discussionStatus=mockReadinessLabel(state.epaDiscussionMock);
@@ -2238,6 +2246,10 @@ function home(){
     <button id="homeInstallButton"><span class="tool-icon">📲</span><b>Install Bench Buddy</b><small>Add Bench Buddy to your home screen for quick access and offline use.</small></button>
   </div></section>`;
   document.getElementById("homeInstallButton")?.addEventListener("click",requestInstall);
+
+  if(benchBuddyIsInstalled()){
+    view().querySelectorAll("[data-install-app], .install-card, #installPrompt, #installBanner").forEach(el=>el.remove());
+  }
 }
 let openAssignmentId=null;
 
@@ -2621,6 +2633,8 @@ function evidence(){
 
     try{
       await downloadAssignmentPdf(a,ev,state.profile);
+      btn.disabled=false;
+      btn.textContent=originalText;
       refreshEvidenceKeepingPlace(id);
     }catch(error){
       console.error(error);
@@ -3039,7 +3053,9 @@ function documents(){
 
   view().querySelectorAll("[data-redownload]").forEach(b=>b.onclick=async()=>{
     const doc=state.documents.find(x=>x.id===b.dataset.redownload);
-    if(doc.fileKey){
+    if(doc.type==="Assignment Evidence Pack"){
+      await downloadStoredAssignmentPdf(doc.assignmentId);
+    }else if(doc.fileKey){
       const file=await getFile(doc.fileKey);
       if(!file){alert("This saved file could not be found on this device.");return}
       const url=URL.createObjectURL(file);
@@ -3048,8 +3064,6 @@ function documents(){
       a.download=doc.title.endsWith(".pdf")?doc.title:`${doc.title}.pdf`;
       a.click();
       setTimeout(()=>URL.revokeObjectURL(url),1000);
-    }else if(doc.type==="Assignment Evidence Pack"){
-      await downloadStoredAssignmentPdf(doc.assignmentId);
     }else if(doc.type==="Witness Testimony"){
       await downloadWitnessPdf(doc,state.profile);
     }else if(doc.type==="External Document"){
@@ -3154,7 +3168,7 @@ function settings(){
       <button class="primary" id="saveProfile">Save settings</button>
       <button class="secondary" id="backup">Export backup</button>
     </div>
-    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.4.3</p>
+    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.4.4</p>
   </section>`;
   const getSignature=setupSignaturePad(
     document.getElementById("learnerSignature"),
