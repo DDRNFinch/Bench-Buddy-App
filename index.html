@@ -702,28 +702,51 @@ const sentence=text=>{
   return /[.!?]$/.test(clean)?clean:`${clean}.`;
 };
 
-const skillPromptBank={
-  1:[["PPE","ppe"],["safe working","safe"],["equipment checks","check"]],
-  2:[["waste","waste"],["recycling","recycl"],["efficient materials","efficient"]],
-  3:[["drawing","drawing"],["dimensions","dimension"],["specification","specification"]],
-  4:[["timber selection","timber"],["measurements","measur"],["cutting list","cutting list"]],
-  5:[["hand tools","hand tool"],["power tools","power tool"],["safe use","safe"]],
-  6:[["marking out","mark"],["accuracy","accur"],["datum","datum"]],
-  7:[["machine setup","setup"],["guards","guard"],["extraction","extraction"]],
-  8:[["cutting","cut"],["planing","plane"],["dimensions","dimension"]],
-  9:[["joints","joint"],["fit","fit"],["accuracy","accur"]],
-  10:[["adhesive","adhesive"],["clamping","clamp"],["square","square"]],
-  11:[["door components","door"],["joints","joint"],["assembly","assembl"]],
-  12:[["window components","window"],["setting out","setting"],["finish","finish"]],
-  13:[["stair components","stair"],["angles","angle"],["assembly","assembl"]],
-  14:[["unit components","unit"],["carcase","carcase"],["fixings","fixing"]],
-  15:[["mouldings","moulding"],["profile","profile"],["machine setup","setup"]],
-  16:[["spindles","spindle"],["consistent size","consistent"],["finish","finish"]],
-  17:[["fire door","fire door"],["seals","seal"],["ironmongery","ironmongery"]],
-  18:[["surface preparation","prepar"],["abrasives","abrasive"],["finish","finish"]],
-  19:[["quality checks","quality"],["defects","defect"],["tolerances","tolerance"]],
-  20:[["communication","communicat"],["teamwork","team"],["professional","professional"]]
-};
+function cleanSkillLabel(text){
+  let label=String(text||"").replace(/^show\s+/i,"").replace(/^the\s+/i,"").replace(/\.$/,"").trim();
+  const patterns=[
+    [/risk assessment|rams/i,"RAMS"],[/cutting list/i,"Cutting list"],
+    [/personal protective equipment|\bppe\b/i,"PPE"],[/respiratory protective equipment|\brpe\b/i,"RPE"],
+    [/local exhaust ventilation|\blev\b/i,"LEV"],[/drawing|working drawing/i,"Drawing"],
+    [/specification/i,"Specification"],[/material list/i,"Material list"],[/toolbox talk/i,"Toolbox talk"],
+    [/site induction/i,"Site induction"],[/hand tools?/i,"Hand tools"],[/power tools?/i,"Power tools"],
+    [/machine setup|machine setting/i,"Machine setup"],[/guards?/i,"Guarding"],[/dust extraction|extraction/i,"Extraction"],
+    [/marking out|setting out/i,"Setting out"],[/measurements?|dimensions?/i,"Measurements"],
+    [/timber selection|material selection/i,"Material selection"],[/safe working|working safely/i,"Safe working"],
+    [/quality checks?|checking the finished work/i,"Quality checks"],[/joint/i,"Joint construction"],
+    [/assembly/i,"Assembly"],[/clamping/i,"Clamping"],[/adhesive/i,"Adhesive"],
+    [/surface preparation/i,"Surface preparation"],[/abrasives?/i,"Abrasives"],[/finish/i,"Finish"],
+    [/fire door/i,"Fire door requirements"],[/seals?/i,"Seals"],[/ironmongery/i,"Ironmongery"],
+    [/communication/i,"Communication"],[/teamwork/i,"Teamwork"],[/professional/i,"Professional behaviour"]
+  ];
+  for(const [pattern,replacement] of patterns){if(pattern.test(label))return replacement;}
+  label=label.replace(/\bbeing\b.*$/i,"").replace(/\bused\b.*$/i,"").replace(/\bcompleted\b.*$/i,"")
+    .replace(/\binstalled\b.*$/i,"").replace(/\bprepared\b.*$/i,"").replace(/\s+/g," ").trim();
+  if(label.length>34)label=label.slice(0,34).replace(/\s+\S*$/,"");
+  return label.charAt(0).toUpperCase()+label.slice(1);
+}
+function termFromLabel(label){
+  const map={"RAMS":"rams","Cutting list":"cutting list","PPE":"ppe","RPE":"rpe","LEV":"lev","Drawing":"drawing",
+  "Specification":"specification","Material list":"material list","Toolbox talk":"toolbox talk","Site induction":"site induction",
+  "Hand tools":"hand tools","Power tools":"power tools","Machine setup":"setup","Guarding":"guard","Extraction":"extraction",
+  "Setting out":"setting out","Measurements":"measur","Material selection":"material","Safe working":"safe",
+  "Quality checks":"check","Joint construction":"joint","Assembly":"assembl","Clamping":"clamp","Adhesive":"adhesive",
+  "Surface preparation":"prepar","Abrasives":"abrasive","Finish":"finish","Fire door requirements":"fire door",
+  "Seals":"seal","Ironmongery":"ironmongery","Communication":"communicat","Teamwork":"team","Professional behaviour":"professional"};
+  return map[label]||label.toLowerCase();
+}
+function assignmentSkillPrompts(assignment){
+  const prompts=(assignment.photos||[]).slice(0,3).map(text=>{
+    const label=cleanSkillLabel(text);
+    return {label,term:termFromLabel(label),source:text};
+  });
+  while(prompts.length<3){
+    const fallback=["Method","Tools","Quality checks"][prompts.length];
+    prompts.push({label:fallback,term:termFromLabel(fallback),source:fallback});
+  }
+  return prompts.slice(0,3);
+}
+
 
 const promptStopWords=new Set([
   "explain","describe","what","which","when","where","how","why","this","that","with","from","into",
@@ -732,70 +755,75 @@ const promptStopWords=new Set([
 ]);
 
 function wordsFromQuestion(question){
-  const cleaned=String(question||"").toLowerCase().replace(/[^a-z0-9\s-]/g," ");
-  const phrases=[
-    ["health and safety","health and safety"],["safe working","safe working"],["risk assessment","risk assessment"],
-    ["building regulations","building regulations"],["quality checks","quality"],["personal protective equipment","ppe"],
-    ["dust extraction","extraction"],["hand tools","hand tools"],["power tools","power tools"],
-    ["material selection","materials"],["environmental","environment"],["professional behaviour","professional"],
-    ["drawing","drawing"],["specification","specification"],["dimensions","dimensions"],["tolerances","tolerances"],
-    ["maintenance","maintenance"],["communication","communication"],["teamwork","teamwork"]
-  ].filter(([phrase])=>cleaned.includes(phrase));
-
-  const chosen=[];
-  phrases.forEach(([label,term])=>{
-    if(!chosen.some(x=>x.term===term))chosen.push({label,term});
-  });
-
-  cleaned.split(/\s+/).forEach(word=>{
-    if(word.length<5||promptStopWords.has(word)||chosen.length>=3)return;
-    const stem=word.replace(/(ing|ed|es|s)$/,"");
-    if(!chosen.some(x=>x.term===stem))chosen.push({label:word,term:stem});
-  });
-
-  const defaults=[
-    {label:"reason",term:"because"},
-    {label:"method",term:"method"},
-    {label:"safe practice",term:"safe"}
+  const original=String(question||"");
+  const cleaned=original.toLowerCase().replace(/[^a-z0-9\s-]/g," ");
+  const exactTerms=[
+    [/\bPPE\b/i,"PPE","ppe"],[/\bRPE\b/i,"RPE","rpe"],[/\bLEV\b/i,"LEV","lev"],
+    [/\bRAMS\b/i,"RAMS","rams"],[/\bCOSHH\b/i,"COSHH","coshh"],[/\bPUWER\b/i,"PUWER","puwer"],
+    [/risk assessment/i,"Risk assessment","risk assessment"],[/method statement/i,"Method statement","method statement"],
+    [/safe system of work/i,"Safe system","safe system"],[/local exhaust ventilation/i,"LEV","lev"],
+    [/personal protective equipment/i,"PPE","ppe"],[/respiratory protective equipment/i,"RPE","rpe"],
+    [/guarding/i,"Guarding","guard"],[/hand tools?/i,"Hand tools","hand tools"],[/power tools?/i,"Power tools","power tools"],
+    [/dust extraction/i,"Extraction","extraction"],[/drawing/i,"Drawing","drawing"],[/specification/i,"Specification","specification"],
+    [/measurements?/i,"Measurements","measur"],[/dimensions?/i,"Dimensions","dimension"],[/tolerances?/i,"Tolerances","tolerance"],
+    [/materials?/i,"Materials","material"],[/waste/i,"Waste","waste"],[/recycl/i,"Recycling","recycl"],
+    [/environment/i,"Environment","environment"],[/maintenance/i,"Maintenance","maintenance"],[/defects?/i,"Defects","defect"],
+    [/quality/i,"Quality","quality"],[/communication/i,"Communication","communicat"],[/teamwork/i,"Teamwork","team"],
+    [/professional/i,"Professional behaviour","professional"],[/fire door/i,"Fire door","fire door"],[/seals?/i,"Seals","seal"],
+    [/ironmongery/i,"Ironmongery","ironmongery"],[/adhesive/i,"Adhesive","adhesive"],[/clamping/i,"Clamping","clamp"],
+    [/joint/i,"Joint","joint"],[/assembly/i,"Assembly","assembl"],[/surface preparation/i,"Surface preparation","prepar"],
+    [/abrasives?/i,"Abrasives","abrasive"],[/finish/i,"Finish","finish"]
   ];
-  defaults.forEach(x=>{if(chosen.length<3&&!chosen.some(y=>y.term===x.term))chosen.push(x)});
+  const chosen=[];
+  exactTerms.forEach(([pattern,label,term])=>{
+    if(pattern.test(original)&&!chosen.some(x=>x.term===term)&&chosen.length<3)chosen.push({label,term});
+  });
+  if(chosen.length<3){
+    cleaned.split(/\s+/).forEach(word=>{
+      if(chosen.length>=3||word.length<5||promptStopWords.has(word))return;
+      const stem=word.replace(/(ing|ed|es|s)$/,"");
+      if(!chosen.some(x=>x.term===stem))chosen.push({label:word.charAt(0).toUpperCase()+word.slice(1),term:stem});
+    });
+  }
+  [{label:"Reason",term:"because"},{label:"Method",term:"method"},{label:"Safe practice",term:"safe"}]
+    .forEach(x=>{if(chosen.length<3&&!chosen.some(y=>y.term===x.term))chosen.push(x)});
   return chosen.slice(0,3);
 }
 
-function ensureCombinedEvidence(evidence={}){
+
+function ensureCombinedEvidence(evidence={},assignment=null){
   evidence.evidenceItems ||= [];
   if(!evidence._combinedMigrated){
+    const prompts=assignment?assignmentSkillPrompts(assignment):[];
     Object.values(evidence.photos||{}).forEach((item,index)=>{
       if(item?.imageKey&&!evidence.evidenceItems.some(x=>x.key===item.imageKey)){
-        evidence.evidenceItems.push({
-          key:item.imageKey,
-          imageKey:item.imageKey,
-          name:`Required photograph ${Number(index)+1}`,
-          type:"image/jpeg",
-          isImage:true
-        });
+        evidence.evidenceItems.push({key:item.imageKey,imageKey:item.imageKey,
+          name:prompts[index]?.label||`Skill evidence ${Number(index)+1}`,type:"image/jpeg",isImage:true});
       }
     });
     (evidence.additionalPhotos||[]).forEach((item,index)=>{
       if(item?.imageKey&&!evidence.evidenceItems.some(x=>x.key===item.imageKey)){
-        evidence.evidenceItems.push({
-          key:item.imageKey,
-          imageKey:item.imageKey,
-          name:`Supporting item ${Number(index)+1}`,
-          type:"image/jpeg",
-          isImage:true
-        });
+        evidence.evidenceItems.push({key:item.imageKey,imageKey:item.imageKey,
+          name:`Supporting evidence ${Number(index)+1}`,type:"image/jpeg",isImage:true});
       }
     });
     if(!evidence.description){
-      evidence.description=Object.values(evidence.photos||{})
-        .map(x=>x?.explanation||"").filter(Boolean).join("\n\n");
+      evidence.description=Object.values(evidence.photos||{}).map(x=>x?.explanation||"").filter(Boolean).join("\n\n");
     }
     evidence._combinedMigrated=true;
+  }
+  if(assignment){
+    const prompts=assignmentSkillPrompts(assignment);
+    evidence.evidenceItems.forEach((item,index)=>{
+      if(index<3&&item.isImage&&(!item.name||/^Required photograph/i.test(item.name)||/^Skill evidence/i.test(item.name))){
+        item.name=prompts[index]?.label||`Skill evidence ${index+1}`;
+      }
+    });
   }
   evidence.answers ||= {};
   return evidence;
 }
+
 
 function promptMatched(text,term){
   return String(text||"").toLowerCase().includes(String(term||"").toLowerCase());
@@ -818,7 +846,7 @@ function fileSizeLabel(size){
 }
 
 function assignmentStatus(assignment,evidence={}){
-  evidence=ensureCombinedEvidence(evidence);
+  evidence=ensureCombinedEvidence(evidence,assignment);
   const itemCount=(evidence.evidenceItems||[]).filter(x=>x?.key).length;
   const descriptionDone=(evidence.description?.trim().length||0)>=30;
   const requiredDone=itemCount>=3&&descriptionDone;
@@ -901,7 +929,7 @@ function detailBox(pdf,items,y){
 
 async function downloadAssignmentPdf(assignment,evidence,profile){
   try{
-    evidence=ensureCombinedEvidence(evidence);
+    evidence=ensureCombinedEvidence(evidence,assignment);
     const {jsPDF}=window.jspdf;
     const pdf=new jsPDF({unit:"mm",format:"a4"});
     const margin=14,contentW=182,bottom=278;
@@ -944,7 +972,7 @@ async function downloadAssignmentPdf(assignment,evidence,profile){
       pdf.roundedRect(margin,y,contentW,rowH,3,3,"F");
       pdf.setFont("helvetica","bold");
       pdf.setFontSize(8.5);
-      pdf.text(`Photograph ${i+1}: ${item.name||"Evidence photograph"}`,margin+5,y+7);
+      pdf.text(`${item.name||assignmentSkillPrompts(assignment)[i]?.label||`Skill evidence ${i+1}`}`,margin+5,y+7);
 
       if(image){
         const props=pdf.getImageProperties(image);
@@ -1841,7 +1869,7 @@ function evidence(){
   assignments.forEach(a=>{
     state.evidence[a.id] ||= {answers:{}};
     const before=JSON.stringify(state.evidence[a.id]);
-    ensureCombinedEvidence(state.evidence[a.id]);
+    ensureCombinedEvidence(state.evidence[a.id],a);
     if(before!==JSON.stringify(state.evidence[a.id]))migrated=true;
   });
   if(migrated)saveState(state);
@@ -1854,9 +1882,9 @@ function evidence(){
   </section>
 
   ${assignments.map(a=>{
-    const ev=ensureCombinedEvidence(state.evidence[a.id]||{answers:{}});
+    const ev=ensureCombinedEvidence(state.evidence[a.id]||{answers:{}},a);
     const status=assignmentStatus(a,ev);
-    const skillPrompts=skillPromptBank[a.id]||a.photos.slice(0,3).map((x,i)=>({label:`Skill ${i+1}`,term:["tool","method","check"][i]}));
+    const skillPrompts=assignmentSkillPrompts(a);
 
     return `<details class="card assignment" data-assignment-id="${a.id}" ${openAssignmentId===a.id?"open":""}>
       <summary>
@@ -1951,7 +1979,7 @@ function evidence(){
     if(!files.length)return;
 
     state.evidence[id] ||= {answers:{},evidenceItems:[]};
-    const ev=ensureCombinedEvidence(state.evidence[id]);
+    const assignment=assignments.find(x=>x.id===id);const ev=ensureCombinedEvidence(state.evidence[id],assignment);
 
     for(const file of files){
       const isImage=file.type.startsWith("image/");
@@ -1961,11 +1989,13 @@ function evidence(){
       }else{
         await putFile(key,file);
       }
+      const promptIndex=ev.evidenceItems.filter(x=>x.isImage).length;
+      const skillLabel=isImage&&promptIndex<3?assignmentSkillPrompts(assignment)[promptIndex]?.label:null;
       ev.evidenceItems.push({
         key,
         imageKey:isImage?key:null,
         fileKey:isImage?null:key,
-        name:file.name||`Evidence item ${ev.evidenceItems.length+1}`,
+        name:skillLabel||file.name||`Evidence item ${ev.evidenceItems.length+1}`,
         type:file.type||"File",
         size:file.size||0,
         isImage
@@ -1979,7 +2009,7 @@ function evidence(){
 
   view().querySelectorAll("[data-remove-combined]").forEach(btn=>btn.onclick=async()=>{
     const [id,index]=btn.dataset.removeCombined.split("-").map(Number);
-    const ev=ensureCombinedEvidence(state.evidence[id]||{});
+    const assignment=assignments.find(x=>x.id===id);const ev=ensureCombinedEvidence(state.evidence[id]||{},assignment);
     const item=ev.evidenceItems?.[index];
     if(item?.key){
       try{await deleteImage(item.key)}catch(e){}
@@ -2001,7 +2031,7 @@ function evidence(){
     const assignment=assignments.find(x=>x.id===Number(id));
     if(!assignment)return;
     state.evidence[id] ||= {answers:{},evidenceItems:[]};
-    const ev=ensureCombinedEvidence(state.evidence[id]);
+    const ev=ensureCombinedEvidence(state.evidence[id],assignment);
     ev.date=view().querySelector(`[data-date="${id}"]`)?.value||ev.date||"";
     const desc=view().querySelector(`[data-description="${id}"]`);
     if(desc)ev.description=desc.value;
@@ -2057,7 +2087,7 @@ function evidence(){
   view().querySelectorAll("[data-pdf]").forEach(btn=>btn.onclick=async()=>{
     const id=Number(btn.dataset.pdf),a=assignments.find(x=>x.id===id);
     saveAssignmentText(id);
-    const ev=ensureCombinedEvidence(state.evidence[id]||{});
+    const ev=ensureCombinedEvidence(state.evidence[id]||{},a);
 
     if(!assignmentStatus(a,ev).complete){
       alert("Add at least 3 evidence items, complete the evidence description and answer all questions first.");
@@ -2604,7 +2634,7 @@ function settings(){
       <button class="primary" id="saveProfile">Save settings</button>
       <button class="secondary" id="backup">Export backup</button>
     </div>
-    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.2.0</p>
+    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.2.1</p>
   </section>`;
   const getSignature=setupSignaturePad(
     document.getElementById("learnerSignature"),
