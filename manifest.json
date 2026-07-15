@@ -1,25 +1,22 @@
 {
   "name": "Bench Buddy",
   "short_name": "Bench Buddy",
-  "description": "Bench Joinery apprenticeship assignments, practical marking, revision and EPA preparation.",
-  "id": "/Bench-Buddy-App/",
-  "start_url": "/Bench-Buddy-App/",
-  "scope": "/Bench-Buddy-App/",
+  "description": "An apprenticeship companion for Bench Joinery learners.",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f4f5f7",
-  "theme_color": "#a85f22",
+  "background_color": "#f3f0eb",
+  "theme_color": "#9d2525",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "./icon-192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     },
     {
-      "src": "icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }
