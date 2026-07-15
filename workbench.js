@@ -72,37 +72,20 @@ function workbench(){
   );
   const recent=value.recent.map(id=>WORKBENCH_CARDS.find(card=>card.id===id)).filter(Boolean);
   const favourites=value.favourites.map(id=>WORKBENCH_CARDS.find(card=>card.id===id)).filter(Boolean);
-  const today=[...WORKBENCH_CARDS]
-    .sort((a,b)=>{
-      const day=Math.floor(Date.now()/86400000);
-      return ((a.id.charCodeAt(0)+day)%17)-((b.id.charCodeAt(0)+day)%17);
-    })
-    .slice(0,3);
 
   view().innerHTML=`
     <section class="card hero workbench-hero">
       <span class="eyebrow">OFFLINE KNOWLEDGE LIBRARY</span>
       <h2>🧰 Workbench</h2>
       <p>Search practical UK bench-joinery reference cards for tools, materials, joints, fixings, machinery, safety and quality.</p>
-      <div class="workbench-search-wrap">
-        <span>🔍</span>
-        <input id="workbenchSearch" value="${workbenchQuery}" placeholder="Search tools, timber, fixings, joints or KSBs…">
-        ${workbenchQuery?'<button id="clearWorkbenchSearch" class="secondary">Clear</button>':""}
-      </div>
       <small>${WORKBENCH_CARDS.length} cards available offline</small>
     </section>
 
-    ${!workbenchQuery&&workbenchCategory==="All"?`
     <section class="card">
-      <div class="section-heading"><div><h3>Today’s Toolbox</h3><p>Three quick references to explore today.</p></div></div>
-      <div class="workbench-feature-grid">${today.map(workbenchCardTile).join("")}</div>
-    </section>`:""}
-
-    <section class="card">
-      <div class="section-heading"><div><h3>Workbench drawers</h3><p>Choose a category or search the full library.</p></div></div>
+      <div class="section-heading"><div><h3>Workbench Drawers</h3><p>Choose a category to browse the library.</p></div></div>
       <div class="workbench-categories">
         <button class="workbench-category ${workbenchCategory==="All"?"active":""}" data-workbench-category="All">
-          <span>🧰</span><b>All cards</b><small>${WORKBENCH_CARDS.length}</small>
+          <span>🧰</span><b>All cards</b><small>${WORKBENCH_CARDS.length} cards</small>
         </button>
         ${categories.map(category=>{
           const meta=WORKBENCH_CATEGORY_META[category];
@@ -111,6 +94,15 @@ function workbench(){
             <span>${meta.icon}</span><b>${category}</b><small>${count} cards</small>
           </button>`;
         }).join("")}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-heading"><div><h3>Search Workbench</h3><p>Type a tool, fixing, material, joint or KSB.</p></div></div>
+      <div class="workbench-search-wrap">
+        <span>🔍</span>
+        <input id="workbenchSearch" value="${workbenchQuery}" placeholder="Search the Workbench…" autocomplete="off" inputmode="search">
+        ${workbenchQuery?'<button id="clearWorkbenchSearch" class="secondary">Clear</button>':""}
       </div>
     </section>
 
@@ -123,7 +115,7 @@ function workbench(){
       <div class="workbench-list">${recent.map(workbenchCardTile).join("")}</div></section>`:""}
 
     <section class="card">
-      <div class="split"><div><h3>${workbenchCategory==="All"?"All Workbench cards":workbenchCategory}</h3>
+      <div class="split"><div><h3>${workbenchQuery?"Search results":(workbenchCategory==="All"?"All Workbench cards":workbenchCategory)}</h3>
       <p class="small">${filtered.length} result${filtered.length===1?"":"s"}${workbenchQuery?` for “${workbenchQuery}”`:""}</p></div></div>
       <div class="workbench-list">
         ${filtered.length?filtered.map(workbenchCardTile).join(""):'<div class="empty">No Workbench cards match this search yet.</div>'}
@@ -137,18 +129,19 @@ function workbench(){
       clearTimeout(search._timer);
       search._timer=setTimeout(workbench,180);
     });
-    search.focus();
-    search.setSelectionRange(search.value.length,search.value.length);
   }
+
   document.getElementById("clearWorkbenchSearch")?.addEventListener("click",()=>{
     workbenchQuery="";
     workbench();
   });
+
   view().querySelectorAll("[data-workbench-category]").forEach(button=>button.onclick=()=>{
     workbenchCategory=button.dataset.workbenchCategory;
     workbenchQuery="";
     workbench();
   });
+
   view().querySelectorAll("[data-workbench-card]").forEach(button=>button.onclick=event=>{
     const id=button.dataset.workbenchCard;
     if(event.target.closest(".workbench-star")){
