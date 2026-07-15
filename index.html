@@ -3203,7 +3203,7 @@ function settings(){
       <button class="primary" id="saveProfile">Save settings</button>
       <button class="secondary" id="backup">Export backup</button>
     </div>
-    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.4.0</p>
+    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.4.1</p>
   </section>`;
   const getSignature=setupSignaturePad(
     document.getElementById("learnerSignature"),
@@ -3228,6 +3228,7 @@ function settings(){
 }
 
 render();
+attachPdfViewerControls();
 
 let deferredPrompt=null;
 const isStandalone=()=>window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone===true;
@@ -3263,6 +3264,18 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
+
+
+<div class="pdf-viewer-modal" id="pdfViewerModal" aria-hidden="true">
+  <div class="pdf-viewer-toolbar">
+    <b id="pdfViewerTitle">Assignment PDF</b>
+    <div class="pdf-viewer-actions">
+      <button class="secondary" id="pdfViewerDownload" type="button">Download</button>
+      <button class="danger" id="pdfViewerClose" type="button">Close</button>
+    </div>
+  </div>
+  <iframe class="pdf-viewer-frame" id="pdfViewerFrame" title="Assignment PDF preview" src="about:blank"></iframe>
+</div>
 
 <div class="preview-modal" id="imagePreviewModal" aria-hidden="true">
   <div class="preview-shell">
