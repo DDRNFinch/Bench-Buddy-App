@@ -195,8 +195,8 @@ header{background:linear-gradient(135deg,#171c23,#272e38);box-shadow:0 8px 26px 
 @media(max-width:760px){.assignment-checklist{grid-template-columns:1fr 1fr}}
 
 
-.evidence-thumb-card{display:grid;grid-template-columns:92px 1fr auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;background:#f8fafc}
-.evidence-thumb-btn{width:92px;height:72px;border:0;border-radius:9px;overflow:hidden;padding:0;background:#e8edf2;display:grid;place-items:center}
+.evidence-thumb-card{display:grid;grid-template-columns:60px 1fr auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;background:#f8fafc}
+.evidence-thumb-btn{width:60px;height:60px;border:0;border-radius:9px;overflow:hidden;padding:0;background:#e8edf2;display:grid;place-items:center}
 .evidence-thumb-btn img{width:100%;height:100%;object-fit:cover;display:block}
 .evidence-thumb-btn:hover{outline:2px solid var(--red)}
 .evidence-thumb-meta b{display:block;margin-bottom:3px}
@@ -214,8 +214,8 @@ header{background:linear-gradient(135deg,#171c23,#272e38);box-shadow:0 8px 26px 
 .preview-prev{left:0}.preview-next{right:0}
 .preview-prev[disabled],.preview-next[disabled]{opacity:.35}
 @media(max-width:700px){
-  .evidence-thumb-card{grid-template-columns:76px 1fr}
-  .evidence-thumb-btn{width:76px;height:64px}
+  .evidence-thumb-card{grid-template-columns:60px 1fr}
+  .evidence-thumb-btn{width:60px;height:60px}
   .evidence-thumb-card>.danger{grid-column:1/-1}
   .preview-prev{left:4px}.preview-next{right:4px}
 }
@@ -998,107 +998,31 @@ function reflectionTopics(assignment){
   const refs=assignmentKsbMap[String(assignment.id)]||[];
   const knowledgeRefs=refs.filter(x=>x.startsWith("K"));
   const behaviourRefs=refs.filter(x=>x.startsWith("B"));
+
   return (assignment.statementQuestions||[]).map((question,index)=>{
     const isBehaviour=index===(assignment.statementQuestions.length-1);
     const ref=isBehaviour
       ? (behaviourRefs.join(", ")||"Behaviour")
       : (knowledgeRefs[index]||knowledgeRefs[Math.min(index,knowledgeRefs.length-1)]||`Knowledge ${index+1}`);
-    return {
-      ref,
-      title:reflectionTopicTitle(question,index),
-      question,
-      prompts:wordsFromQuestion(question)
-    };
-  });
-}
 
+    const title=reflectionTopicTitle(question,index);
+    const extracted=wordsFromQuestion(question);
+    const simplePrompts=extracted.slice(0,2).map(p=>({
+      label:p.label,
+      term:p.term
+    }));
 
-function uniquePrompts(prompts){
-  const seen=new Set();
-  return prompts.filter(prompt=>{
-    const key=String(prompt.term||prompt.label||"").toLowerCase();
-    if(!key||seen.has(key))return false;
-    seen.add(key);return true;
-  });
-}
-
-function combinedReflectionPrompts(assignment){
-  return uniquePrompts(reflectionTopics(assignment).flatMap(topic=>topic.prompts)).slice(0,12);
-}
-
-function reflectionTopicSentence(assignment){
-  const titles=[...new Set(reflectionTopics(assignment).map(topic=>topic.title))];
-  if(!titles.length)return "professional knowledge and behaviours";
-  if(titles.length===1)return titles[0].toLowerCase();
-  return `${titles.slice(0,-1).map(x=>x.toLowerCase()).join(", ")} and ${titles.at(-1).toLowerCase()}`;
-}
-
-function promptRegexSource(prompt){
-  const values=[prompt.label,prompt.term].filter(Boolean).map(value=>String(value).trim());
-  const aliases={
-    "ppe":["PPE","personal protective equipment"],
-    "rpe":["RPE","respiratory protective equipment"],
-    "lev":["LEV","local exhaust ventilation"],
-    "rams":["RAMS","risk assessment","method statement"],
-    "communicat":["communication","communicated","discussed","explained"],
-    "team":["team","teamwork","colleague","colleagues","working together"],
-    "safe":["safe","safely","safe working"],
-    "measur":["measure","measured","measurement","measurements","measuring"],
-    "prepar":["prepare","prepared","preparation","preparing"],
-    "assembl":["assemble","assembled","assembly","assembling"],
-    "recycl":["recycle","recycled","recycling"],
-    "check":["check","checked","checks","checking","quality check","quality checks"]
-  };
-  (aliases[String(prompt.term||"").toLowerCase()]||[]).forEach(value=>values.push(value));
-  return [...new Set(values)].sort((a,b)=>b.length-a.length).map(value=>{
-    const escaped=value.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-    return escaped.length<=5&&!escaped.includes("\\ ")?`\\b${escaped}\\w*\\b`:`\\b${escaped}\\b`;
-  }).join("|");
-}
-
-function highlightedSegments(text,prompts){
-  const sources=uniquePrompts(prompts).map(promptRegexSource).filter(Boolean);
-  if(!sources.length)return [{text:String(text||""),bold:false}];
-  const regex=new RegExp(`(${sources.join("|")})`,`gi`);
-  const segments=[];let last=0;const value=String(text||"");let match;
-  while((match=regex.exec(value))){
-    if(match.index>last)segments.push({text:value.slice(last,match.index),bold:false});
-    segments.push({text:match[0],bold:true});last=match.index+match[0].length;
-    if(regex.lastIndex===match.index)regex.lastIndex++;
-  }
-  if(last<value.length)segments.push({text:value.slice(last),bold:false});
-  return segments;
-}
-
-function drawHighlightedText(pdf,text,prompts,x,y,maxWidth,lineHeight=4.2,newPage=null){
-  const segments=highlightedSegments(text,prompts);
-  let cursorX=x,cursorY=y;
-  const tokens=[];
-  segments.forEach(segment=>{
-    String(segment.text).split(/(\s+|\n)/).forEach(token=>{if(token!=="")tokens.push({text:token,bold:segment.bold})});
-  });
-  for(const token of tokens){
-    if(token.text.includes("\n")){
-      const pieces=token.text.split("\n");
-      for(let i=0;i<pieces.length;i++){
-        if(pieces[i]){
-          pdf.setFont("helvetica",token.bold?"bold":"normal");
-          const width=pdf.getTextWidth(pieces[i]);
-          if(cursorX+width>x+maxWidth){cursorX=x;cursorY+=lineHeight;}
-          if(newPage&&cursorY>276){cursorY=newPage();cursorX=x;}
-          pdf.text(pieces[i],cursorX,cursorY);cursorX+=width;
-        }
-        if(i<pieces.length-1){cursorX=x;cursorY+=lineHeight;if(newPage&&cursorY>276)cursorY=newPage();}
-      }
-      continue;
+    while(simplePrompts.length<2){
+      const fallback=simplePrompts.length===0
+        ? {label:"Explain clearly",term:"because"}
+        : {label:"Give an example",term:"example"};
+      simplePrompts.push(fallback);
     }
-    pdf.setFont("helvetica",token.bold?"bold":"normal");
-    const width=pdf.getTextWidth(token.text);
-    if(cursorX+width>x+maxWidth&&!/^\s+$/.test(token.text)){cursorX=x;cursorY+=lineHeight;if(newPage&&cursorY>276)cursorY=newPage();}
-    if(!(cursorX===x&&/^\s+$/.test(token.text))){pdf.text(token.text,cursorX,cursorY);cursorX+=width;}
-  }
-  return cursorY+lineHeight;
+
+    return {ref,title,question,prompts:simplePrompts};
+  });
 }
+
 
 function ensurePortfolioReflection(evidence={}){
   if(!evidence.reflection){
@@ -1111,10 +1035,10 @@ function assignmentStatus(assignment,evidence={}){
   evidence=ensurePortfolioReflection(ensureCombinedEvidence(evidence,assignment));
   const itemCount=(evidence.evidenceItems||[]).filter(x=>x?.key).length;
   const descriptionWords=wordCount(evidence.description);
-  const reflectionWords=wordCount(evidence.reflection);
+  const reflectionWords=wordCount(evidence.reflection||'');
   const descriptionDone=descriptionWords>=150;
   const requiredDone=itemCount>=3&&descriptionDone;
-  const answersDone=reflectionWords>=300;
+  const answersDone=reflectionWords>=150;
   const hasAny=itemCount>0||descriptionWords>0||reflectionWords>0;
   const pdfGenerated=state.documents?.some(x=>x.type==="Assignment Evidence Pack"&&x.assignmentId===assignment.id);
   return {
@@ -2218,6 +2142,7 @@ function evidence(){
             <b>📎 Evidence required</b>
             <ol class="evidence-required-list">
               ${evidencePrompts.map(p=>`<li>${p.label}</li>`).join("")}
+              <li>+ Any supporting evidence</li>
             </ol>
           </div>
           <span>${status.itemCount}/3 minimum</span>
@@ -2234,6 +2159,7 @@ function evidence(){
           <label class="upload-choice">📄 Upload Files
             <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" multiple data-combined-upload="${a.id}">
           </label>
+          <button type="button" class="secondary" data-close-upload="${a.id}">Cancel</button>
         </div>
 
         <div class="evidence-file-list">
@@ -2269,7 +2195,7 @@ function evidence(){
         ${renderPromptGuide(combinedReflectionPrompts(a),ev.reflection||"",`reflection-${a.id}`)}
 
         <textarea class="reflection-textarea" data-reflection="${a.id}" maxlength="9000" placeholder="Write one detailed reflection of at least 300 words that covers all topics and highlighted prompts.">${ev.reflection||""}</textarea>
-        <small class="char-count word-count" data-reflection-count="${a.id}">${wordCount(ev.reflection)} / 300 words minimum</small>
+        <small class="char-count word-count" data-reflection-count="${a.id}">${wordCount(ev.reflection)} / 150 words minimum</small>
         <span class="autosave-note">Your reflection saves automatically</span>
       </section>`:`<p class="locked">Add at least 3 evidence items and write a 150-word activity statement to unlock the Knowledge & Behaviour Reflection.</p>`}
 
@@ -2289,6 +2215,10 @@ function evidence(){
 
   view().querySelectorAll("[data-toggle-upload]").forEach(btn=>btn.onclick=()=>{
     view().querySelector(`[data-upload-menu="${btn.dataset.toggleUpload}"]`)?.classList.toggle("open");
+  });
+
+  view().querySelectorAll("[data-close-upload]").forEach(btn=>btn.onclick=()=>{
+    view().querySelector(`[data-upload-menu="${btn.dataset.closeUpload}"]`)?.classList.remove("open");
   });
 
   attachPreviewModalControls();
@@ -2392,7 +2322,7 @@ function evidence(){
     const refresh=()=>{
       const count=wordCount(box.value);
       const el=view().querySelector(`[data-reflection-count="${id}"]`);
-      if(el){el.textContent=`${count} / 300 words minimum`;el.classList.toggle("valid",count>=300)}
+      if(el){el.textContent=`${count} / 150 words minimum`;el.classList.toggle("valid",count>=150)}
       updateChips(`reflection-${id}`,box.value);
     };
     box.addEventListener("input",()=>{refresh();schedule(id)});
@@ -2404,7 +2334,7 @@ function evidence(){
     saveText(id);
     const ev=ensurePortfolioReflection(ensureCombinedEvidence(state.evidence[id]||{},a));
     if(!assignmentStatus(a,ev).complete){
-      alert("Add 3 evidence items, write a 150-word activity statement and a 300-word Knowledge & Behaviour Reflection first.");
+      alert("Add 3 evidence items, write a 150-word activity statement and a 150-word Knowledge & Behaviour Reflection first.");
       return;
     }
     const doc={id:`assignment-${id}`,type:"Assignment Evidence Pack",title:`Assignment ${id} - ${a.title}`,date:new Date().toISOString(),assignmentId:id};
@@ -2939,7 +2869,7 @@ function settings(){
       <button class="primary" id="saveProfile">Save settings</button>
       <button class="secondary" id="backup">Export backup</button>
     </div>
-    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.3.3</p>
+    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 1.3.4</p>
   </section>`;
   const getSignature=setupSignaturePad(
     document.getElementById("learnerSignature"),
