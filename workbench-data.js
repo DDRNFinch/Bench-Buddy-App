@@ -80,7 +80,7 @@ function workbench(){
   view().innerHTML=`
     <section class="card hero workbench-hero">
       <span class="eyebrow">OFFLINE KNOWLEDGE LIBRARY</span>
-      <div class="split"><h2>🧰 Workbench</h2><span class="version-badge">v3.0.2</span></div>
+      <div class="split"><h2>🧰 Workbench</h2><span class="version-badge">v3.0.3</span></div>
       <p>Search practical UK bench-joinery reference cards for tools, materials, joints, fixings, machinery, safety and quality.</p>
       <small>${WORKBENCH_CARDS.length} cards available</small>
     </section>
