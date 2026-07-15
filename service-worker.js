@@ -1,6 +1,6 @@
 
 "use strict";
-const CACHE_NAME="bench-buddy-v2-0-3";
+const CACHE_NAME="bench-buddy-v2-0-4";
 const APP_FILES=[
   "./",
   "./index.html",
