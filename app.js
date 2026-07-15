@@ -333,9 +333,16 @@ const promptAliases={
 };
 
 function promptMatchedWithAliases(text,term){
-  if(promptMatched(text,term))return true;
-  const aliases=promptAliases[String(term||"").toLowerCase()]||[];
-  return aliases.some(alias=>promptMatched(text,alias));
+  const alternatives=String(term||"")
+    .split("|||")
+    .map(value=>value.trim())
+    .filter(Boolean);
+
+  return alternatives.some(value=>{
+    if(promptMatched(text,value))return true;
+    const aliases=promptAliases[value.toLowerCase()]||[];
+    return aliases.some(alias=>promptMatched(text,alias));
+  });
 }
 
 function renderPromptGuide(prompts,text,dataPrefix){
@@ -420,10 +427,97 @@ function shortEvidenceLabel(text){
   return label.split(/\s+/).slice(0,3).join(" ");
 }
 
+function practicalPromptTerms(label,source=""){
+  const map={
+    "Safe workspace":["safe workspace","work area","working area","workspace","prepared safely","safe area"],
+    "PPE and RPE":["ppe","rpe","lev","protective equipment","respiratory protection"],
+    "Safe working":["safe working","worked safely","working safely","safety procedures","safe procedures"],
+    "Waste sorting":["waste sorting","waste separated","segregated waste","recycling","recycled","reuse","disposal"],
+    "Material efficiency":["material efficiency","materials efficiently","efficient use","reduced waste","minimise waste","minimized waste"],
+    "Environmental working":["environmental working","environmentally responsible","clean work area","cleaned the area","environment"],
+    "Drawing":["drawing","technical drawing","specification","plan"],
+    "Manufacturing":["manufacturing","manufactured","making","producing","produced"],
+    "Specification check":["specification check","checked specification","matched the specification","drawing check","checked the drawing"],
+    "Material selection":["material selection","selected timber","selected materials","timber selection","board selection"],
+    "Cutting list":["cutting list","measurements","quantities","measured","material quantities"],
+    "Material preparation":["material preparation","materials prepared","prepared materials","ready for manufacture"],
+    "Working with colleagues":["working with colleagues","colleague","supervisor","discussed the task","communication"],
+    "Teamwork":["teamwork","team working","worked as a team","working together","supported colleagues"],
+    "Wellbeing support":["wellbeing support","wellbeing","support available","inclusive workplace","supportive workplace"],
+    "Tool selection":["tool selection","selected tools","selected hand tools","correct tools"],
+    "Tool use":["tool use","used hand tools","hand tools","used safely","used accurately"],
+    "Tool maintenance":["tool maintenance","maintained tools","sharpening","sharpened","safe storage"],
+    "Power tool checks":["power tool checks","checked the power tool","inspected the tool","tool inspection","selected power tool"],
+    "Power tool use":["power tool use","used the power tool","portable power tool","used safely"],
+    "Tool storage":["tool storage","stored the tool","cleaned and stored","safe condition"],
+    "Jig materials":["jig materials","materials for the jig","prepared the jig materials"],
+    "Jig manufacture":["jig manufacture","manufactured the jig","made the jig","assembled the jig"],
+    "Jig testing":["jig testing","tested the jig","checked the jig","completed jig"],
+    "Setting out":["setting out","setting-out","setting rod","template","rod"],
+    "Marking out":["marking out","marked out","measured and marked","marked timber"],
+    "Component checks":["component checks","checked components","marked components","ready for cutting"],
+    "Joint marking":["joint marking","marked the joints","marked joint components","joint components"],
+    "Joint cutting":["joint cutting","cut the joints","joints cut","fitted the joints"],
+    "Joint quality":["joint quality","checked the joints","accurate shoulders","joint fit","completed joints"],
+    "Connection preparation":["connection preparation","prepared the timber","timber prepared","prepared the connection"],
+    "Connection assembly":["connection assembly","assembled the connection","connection methods","dowels","biscuits","adhesive","fixings"],
+    "Connection checks":["connection checks","checked the connection","completed connection","connected components"],
+    "Window components":["window components","casement components","prepared the window","set out the window"],
+    "Window assembly":["window assembly","assembled the window","casement assembly","assembled the casement"],
+    "Window checks":["window checks","checked the window","completed window","rebates","ironmongery"],
+    "Stair components":["stair components","staircase components","prepared the staircase","marked out the staircase"],
+    "Stair manufacture":["stair manufacture","manufactured the staircase","assembled the staircase","staircase assembly"],
+    "Stair checks":["stair checks","checked the staircase","completed staircase","inspection"],
+    "Frame components":["frame components","lining materials","prepared the frame","set out the frame"],
+    "Frame assembly":["frame assembly","assembled the frame","assembled the lining","door frame assembly"],
+    "Frame checks":["frame checks","checked the frame","checked dimensions","completed frame","completed lining"],
+    "Door components":["door components","prepared the door","marked out the door","timber door components"],
+    "Door assembly":["door assembly","assembled the door","timber door assembly"],
+    "Door checks":["door checks","checked the door","completed door","joint checks","quality checked"],
+    "Unit components":["unit components","prepared the unit","wall unit materials","floor unit materials"],
+    "Unit assembly":["unit assembly","assembled the unit","wall unit assembly","floor unit assembly"],
+    "Unit checks":["unit checks","checked the unit","completed unit","inspection"],
+    "Component preparation":["component preparation","prepared materials","moulding materials","stair components"],
+    "Machining":["machining","machined","machine used","products machined"],
+    "Finished component":["finished component","completed moulding","completed spindle","completed balustrade","finished profile"],
+    "Surface preparation":["surface preparation","prepared the surface","sanding","sanded"],
+    "Finish or ironmongery":["finish","finishing","ironmongery","applied the finish","fitted ironmongery"],
+    "Finished product":["finished product","completed product","finish applied","ironmongery fitted"],
+    "Machine inspection":["machine inspection","inspected the machine","pre-use checks","checked the machine"],
+    "Machine operation":["machine operation","operated the machine","machine setup","set up the machine","fixed machine"],
+    "Machined component":["machined component","component produced","completed component","produced on the machine"],
+    "Fire-door components":["fire-door components","fire door components","fire door","prepared the fire door"],
+    "Seals and checks":["seals","ironmongery","quality checks","checked gaps","fire door checks"],
+    "Fire-door assembly":["fire-door assembly","fire door assembly","completed fire door","required specification"]
+  };
+
+  const values=[
+    label,
+    ...(map[label]||[])
+  ];
+
+  // Include useful exact words from the original evidence instruction.
+  const sourceWords=String(source||"")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g," ")
+    .split(/\s+/)
+    .filter(word=>word.length>=5&&!promptStopWords.has(word))
+    .slice(0,6);
+
+  values.push(...sourceWords);
+
+  return [...new Set(values.filter(Boolean))];
+}
+
 function assignmentEvidencePrompts(assignment){
   return (assignment.photos||[]).slice(0,3).map((text,index)=>{
     const label=shortEvidenceLabel(text);
-    return {label,term:termFromLabel(cleanSkillLabel(text)),source:text,index};
+    return {
+      label,
+      term:practicalPromptTerms(label,text).join("|||"),
+      source:text,
+      index
+    };
   });
 }
 
@@ -2493,7 +2587,7 @@ function settings(){
       <button class="primary" id="saveProfile">Save settings</button>
       <button class="secondary" id="backup">Export backup</button>
     </div>
-    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 2.0.1</p>
+    <p class="muted" style="text-align:center;margin-top:18px">Bench Buddy • Version 2.0.2</p>
   </section>`;
   const getSignature=setupSignaturePad(
     document.getElementById("learnerSignature"),
